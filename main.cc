@@ -15,16 +15,23 @@ using namespace std;
 
 struct MapSection
 {
-  uint32_t address;
-  uint32_t size;
+  uint32_t begin_adr;
+  uint32_t end_adr;
   std::string object_name;
+
+  uint32_t GetSize() const
+  {
+    return end_adr - begin_adr + 1;
+  }
 
   friend ostream &operator<<(ostream &os, const MapSection &msec);
 };
 
 ostream &operator<<(ostream &os, const MapSection &msec)
 {
-  os << "0x" << hex << uppercase << setw(8) << msec.address << " |" << dec << setw(8) << msec.size << " | " << msec.object_name;
+  os << "0x" << hex << uppercase << setw(8) << msec.begin_adr << " |"
+     << "0x" << hex << uppercase << setw(8) << msec.end_adr
+     << " |" << dec << setw(8) << msec.GetSize() << " | " << msec.object_name;
   return os;
 }
 
@@ -68,73 +75,70 @@ split(std::string const &original, char separator)
   results.push_back(std::string(start, next));
   return results;
 }
+bool is_space( char c ) 
+{
+  return c==' ';
+}
 
 MapSection parse_entry(string const &entry)
 {
   vector<string> container;
-  auto splitted = boost::split(container, entry, boost::is_any_of(" "), boost::token_compress_on);
-  if (splitted.size() <= 1)
+  //container.reserve(5);
+ 
+  auto splitted = boost::split(container, entry, is_space, boost::token_compress_on);
+  if (splitted.size() <= 3)
   {
     throw "No enough elements";
   }
 
   if (!boost::starts_with(splitted[1], "0x"))
   {
-    throw "No enough elements";
+    throw "First element is not a hex value";
   };
 
   std::size_t processed = 0;
   auto address = std::stoul(splitted[1].substr(2, string::npos), &processed, 16);
 
-  if (splitted.size() <= 2)
-  {
-    throw "No enough elements";
-  }
-
   if (!boost::starts_with(splitted[2], "0x"))
   {
-    throw "No enough elements";
+    throw "Second element is not a hex value";
   };
 
   auto size = std::stoul(splitted[2].substr(2, string::npos), &processed, 16);
-  if (splitted.size() <= 3)
-  {
-    throw "No enough elements";
-  }
 
   MapSection sec = {
-      .address = static_cast<uint32_t>(address),
-      .size = static_cast<uint32_t>(size),
+      .begin_adr = static_cast<uint32_t>(address),
+      .end_adr = static_cast<uint32_t>(address) + static_cast<uint32_t>(size) - 1,
       .object_name = splitted[3]};
 
   return sec;
 }
-void parse_lines(string const &str)
+
+vector<MapSection> parse_lines(string const &str)
 {
   const char separator = '\n';
   std::string::const_iterator start = str.begin();
   std::string::const_iterator end = str.end();
   std::string::const_iterator next = std::find(start, end, separator);
+  vector<MapSection> list;
 
-  auto i = 0;
+
   while (next != end)
   {
-    if (i == 5000)
-    {
-      break;
-    }
     try
     {
       auto sec = parse_entry(std::string(start, next));
-      cout << sec << endl;
+      list.push_back(sec);
     }
     catch (...)
     {
     }
-    i++;
+    
     start = next + 1;
     next = std::find(start, end, separator);
   }
+
+  return list;
 }
 
 int main(int argc, char *argv[])
@@ -163,6 +167,7 @@ int main(int argc, char *argv[])
 
   auto &filename = result["filename"].as<std::string>();
 
+  cout<<"Read file..."<<endl;
   std::string str = get_file_contents(filename.c_str());
 
   // find sections
@@ -170,10 +175,18 @@ int main(int argc, char *argv[])
   auto linker_pos = str.find("Linker script and memory map", mem_cfg_pos);
   auto output_pos = str.find("OUTPUT(", linker_pos);
 
+  cout<<"Extract..."<<endl;
   auto mem_cfg = str.substr(mem_cfg_pos, linker_pos - mem_cfg_pos);
   auto linkage = str.substr(linker_pos, output_pos - linker_pos);
 
-  parse_lines(linkage);
+  cout<<"Parse..."<<endl;
+  auto sections = parse_lines(linkage);
+
+  cout<<"Iterate..."<<endl;
+  for (auto s : sections)
+  {
+    cout << s << endl;
+  }
   //auto contents = split(str, '\n');
   //std::cout << contents.size() << std::endl;
   return 0;
