@@ -13,21 +13,20 @@
 
 using namespace std;
 
-
-struct MapSection {
+struct MapSection
+{
   uint32_t address;
   uint32_t size;
   std::string object_name;
 
-  friend ostream& operator<<(ostream& os, const MapSection& msec);
+  friend ostream &operator<<(ostream &os, const MapSection &msec);
 };
 
-ostream& operator<<(ostream& os, const MapSection& msec)
+ostream &operator<<(ostream &os, const MapSection &msec)
 {
-    os <<"0x"<< hex << uppercase << setw(8) << msec.address << " |" << dec << setw(8) << msec.size << " | " << msec.object_name;
-    return os;
+  os << "0x" << hex << uppercase << setw(8) << msec.address << " |" << dec << setw(8) << msec.size << " | " << msec.object_name;
+  return os;
 }
-
 
 std::string get_file_contents(const char *filename)
 {
@@ -70,44 +69,45 @@ split(std::string const &original, char separator)
   return results;
 }
 
-void parse_entry(string const &entry)
+MapSection parse_entry(string const &entry)
 {
   vector<string> container;
   auto splitted = boost::split(container, entry, boost::is_any_of(" "), boost::token_compress_on);
-  if (splitted.size() <= 2)
+  if (splitted.size() <= 1)
   {
-    return; // not enough elements ... its sure that this entry has no address and size
+    throw "No enough elements";
   }
 
   if (!boost::starts_with(splitted[1], "0x"))
   {
-    return; // does not start with 0x
+    throw "No enough elements";
   };
 
   std::size_t processed = 0;
   auto address = std::stoul(splitted[1].substr(2, string::npos), &processed, 16);
 
-  if (splitted.size() <= 3)
+  if (splitted.size() <= 2)
   {
-    return; // not enough elements ... its sure that the entry has no size
+    throw "No enough elements";
   }
 
   if (!boost::starts_with(splitted[2], "0x"))
   {
-    return; // does not start with 0x
+    throw "No enough elements";
   };
 
   auto size = std::stoul(splitted[2].substr(2, string::npos), &processed, 16);
-
+  if (splitted.size() <= 3)
+  {
+    throw "No enough elements";
+  }
 
   MapSection sec = {
-    .address = static_cast<uint32_t>(address),
-    .size = static_cast<uint32_t>(size),
-    .object_name = splitted[3]
-  };
+      .address = static_cast<uint32_t>(address),
+      .size = static_cast<uint32_t>(size),
+      .object_name = splitted[3]};
 
-
-  cout << sec <<endl;
+  return sec;
 }
 void parse_lines(string const &str)
 {
@@ -123,8 +123,14 @@ void parse_lines(string const &str)
     {
       break;
     }
-    parse_entry(std::string(start, next));
-
+    try
+    {
+      auto sec = parse_entry(std::string(start, next));
+      cout << sec << endl;
+    }
+    catch (...)
+    {
+    }
     i++;
     start = next + 1;
     next = std::find(start, end, separator);
