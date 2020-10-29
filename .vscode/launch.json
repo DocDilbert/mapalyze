@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/mapalyze",
-            "args": [],
+            "args": ["EDESapp.map"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
