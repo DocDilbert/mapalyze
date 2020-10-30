@@ -366,19 +366,19 @@ int main(int argc, char *argv[])
 
   auto &filename = result["filename"].as<std::string>();
 
-  cout << "Read file..." << endl;
+  cout << "Read file ..." << endl;
   std::string str = get_file_contents(filename.c_str());
 
   // find sections
   auto mem_cfg_pos = str.find("Memory Configuration", 0);
 
-  // get the firts entry which is a linker placement
+  // get the first entry which contains useful information linker placement
   auto linker_pos = str.find("Linker script and memory map", mem_cfg_pos);
   auto linker_nl_pos = str.find("\n", linker_pos) + 1;
   linker_nl_pos = str.find("\n", linker_nl_pos) + 1;
   auto output_pos = str.find("OUTPUT(", linker_nl_pos);
 
-  cout << "Extract..." << endl;
+  cout << "Extract ..." << endl;
   auto mem_cfg = str.substr(mem_cfg_pos, linker_pos - mem_cfg_pos);
   auto linkage = str.substr(linker_nl_pos, output_pos - linker_nl_pos);
 
@@ -419,7 +419,7 @@ int main(int argc, char *argv[])
 
   for (auto i : objects_combined)
   {
-    // cout << i << endl;
+    cout << i << endl;
   }
   return 0;
 }
