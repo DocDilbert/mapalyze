@@ -12,6 +12,8 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+#include <chrono> // for high_resolution_clock
+
 using namespace std;
 
 enum SectionType
@@ -274,8 +276,7 @@ Object parse_object(vector<string> elements, Filter filter)
       .address = elements[1],
       .size = elements[2],
       .filename = filename,
-      .filter  = filter
-  };
+      .filter = filter};
 
   return obj;
 }
@@ -381,15 +382,30 @@ int main(int argc, char *argv[])
   auto mem_cfg = str.substr(mem_cfg_pos, linker_pos - mem_cfg_pos);
   auto linkage = str.substr(linker_nl_pos, output_pos - linker_nl_pos);
 
-  cout << "Parse..." << endl;
+  // Pass 1
+  cout << "Parse sections ..." << flush;
+  auto start = std::chrono::high_resolution_clock::now();
   auto sections = parse_sections(linkage);
+  auto finish = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = finish - start;
+  std::cout << " " << elapsed.count() << " s" << endl;
+
+  // Pass 2
+  cout << "Parse filters  ..." << flush;
+  start = std::chrono::high_resolution_clock::now();
   vector<Filter> filters_combined;
   for (auto s : sections)
   {
     auto filters = parse_filters(linkage, s);
     filters_combined.insert(filters_combined.end(), filters.begin(), filters.end());
   }
-  auto fil = filters_combined[filters_combined.size() - 7];
+  finish = std::chrono::high_resolution_clock::now();
+  elapsed = finish - start;
+  std::cout << " " << elapsed.count() << " s" << endl;
+
+  // Pass 3
+  cout << "Parse objects  ..." << flush;
+  start = std::chrono::high_resolution_clock::now();
 
   vector<Object> objects_combined;
   for (auto f : filters_combined)
@@ -397,10 +413,13 @@ int main(int argc, char *argv[])
     auto objects = parse_objects(linkage, f);
     objects_combined.insert(objects_combined.end(), objects.begin(), objects.end());
   }
+  finish = std::chrono::high_resolution_clock::now();
+  elapsed = finish - start;
+  std::cout << " " << elapsed.count() << " s" << endl;
 
   for (auto i : objects_combined)
   {
-   // cout << i << endl;
+    // cout << i << endl;
   }
   return 0;
 }
