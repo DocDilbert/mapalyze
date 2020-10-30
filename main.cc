@@ -207,7 +207,7 @@ vector<Filter> parse_filters(string const &str, const Section &sec)
   std::string::const_iterator next = std::find(start, end, separator);
 
   vector<Filter> filters;
-  while (next != end)
+  while (next < end)
   {
     auto line = std::string(start, next);
     // reduce solutions
@@ -236,6 +236,105 @@ vector<Filter> parse_filters(string const &str, const Section &sec)
   }
 
   return filters;
+}
+
+struct Object
+{
+  string secname;
+  string filename;
+  string address;
+  string size;
+};
+
+ostream &operator<<(ostream &os, const Object &obj)
+{
+  os.width(45);
+  os << left << obj.filename;
+  os << left << obj.address << " ";
+  os << left << obj.size;
+  //os << left << obj.secname << " ";
+  return os;
+}
+
+Object parse_object(vector<string> elements)
+{
+  string filename;
+  if (boost::starts_with(elements[0], "*fill*"))
+  {
+    filename = "";
+  }
+  else
+  {
+    auto path_fn = elements[3];
+    filename = path_fn.substr(path_fn.find_last_of("\\/") + 1, string::npos);
+  }
+  Object obj = {
+      .secname = elements[0],
+      .address = elements[1],
+      .size = elements[2],
+      .filename = filename
+  };
+
+  return obj;
+}
+vector<Object> parse_objects(string const &str, const Filter &filter)
+{
+  const char separator = '\n';
+  std::string::const_iterator start = str.begin() + filter.start_pos;
+  std::string::const_iterator end = str.begin() + filter.end_pos;
+  std::string::const_iterator next = std::find(start, end, separator);
+  start = next + 1;
+  next = std::find(start, end, separator); // ignore first line because this is the line which contains the filter
+
+  vector<Object> objects;
+  while (next < end)
+  {
+    auto line = std::string(start, next);
+
+    // reduce solutions
+    if (count_trailing_spaces(line) == 1)
+    {
+      line = remove_trailing_cr(line);
+      boost::trim(line);
+      vector<string> container;
+      auto splitted = boost::split(container, line, boost::is_any_of(" "), boost::token_compress_on);
+
+      if (splitted.size() == 1)
+      { // line is incompelete ... search for content on new line
+        start = next + 1;
+        next = std::find(start, end, separator);
+        line = std::string(start, next);
+        line = remove_trailing_cr(line);
+        boost::trim(line);
+        vector<string> container2;
+        auto splitted2 = boost::split(container, line, boost::is_any_of(" "), boost::token_compress_on);
+
+        splitted.insert(splitted.end(), splitted2.begin(), splitted2.end());
+      }
+
+      objects.push_back(parse_object(splitted));
+    }
+
+    start = next + 1;
+    next = std::find(start, end, separator);
+  }
+
+#ifdef _1_
+  // update end positions
+  if (filters.size() > 1)
+  {
+    for (int i = 0; i < filters.size() - 1; i++)
+    {
+      filters[i].end_pos = filters[i + 1].start_pos - 2;
+    }
+  }
+  if (filters.size() > 0)
+  {
+    filters[filters.size() - 1].end_pos = sec.end_pos - 1;
+  }
+#endif
+
+  return objects;
 }
 
 int main(int argc, char *argv[])
@@ -288,13 +387,18 @@ int main(int argc, char *argv[])
     auto filters = parse_filters(linkage, s);
     filters_combined.insert(filters_combined.end(), filters.begin(), filters.end());
   }
+  auto fil = filters_combined[filters_combined.size() - 7];
 
+  vector<Object> objects_combined;
   for (auto f : filters_combined)
   {
-    cout << f << endl;
+    auto objects = parse_objects(linkage, f);
+    objects_combined.insert(objects_combined.end(), objects.begin(), objects.end());
   }
 
-  auto filter = filters_combined[3];
-  //cout << linkage.substr(filter.start_pos, filter.end_pos-filter.start_pos) <<endl;
+  for (auto i : objects_combined)
+  {
+   // cout << i << endl;
+  }
   return 0;
 }
