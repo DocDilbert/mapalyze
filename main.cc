@@ -128,6 +128,7 @@ struct Section
   string adress;
   string size;
   long start_pos;
+  long end_pos;
 };
 
 void ParseObjectLine(const std::string &str)
@@ -171,8 +172,9 @@ Section parse_section(const string &line, unsigned start_pos)
   Section new_sec = {
       .section_name = splitted[0],
       .adress = splitted[1],
-      .size = splitted[2],
-      .start_pos = start_pos
+      .size = splitted[2].substr(0, splitted[2].size() - 1),
+      .start_pos = start_pos,
+      .end_pos = -1 // updated later
   };
 
   return new_sec;
@@ -181,11 +183,15 @@ Section parse_section(const string &line, unsigned start_pos)
 ostream &operator<<(ostream &os, const Section &msec)
 {
   os.width(20);
-  
-  os  << left << msec.section_name << " "<< msec.adress <<" "<< msec.size;
+
+  os << left << msec.section_name
+     << " " << msec.adress << " ";
+  os.width(10);
+  os << left << msec.size
+     << " " << msec.start_pos
+     << " " << msec.end_pos;
   return os;
 }
-
 
 vector<Section> parse_sections(string const &str)
 {
@@ -211,7 +217,13 @@ vector<Section> parse_sections(string const &str)
     start = next + 1;
     next = std::find(start, end, separator);
   }
-
+  
+  // update end positions
+  for (int i = 0; i < sections.size() - 1; i++)
+  {
+    sections[i].end_pos = sections[i + 1].start_pos - 1;
+  }
+  sections[sections.size()-1].end_pos = str.size()-1;
   return sections;
 }
 
@@ -263,6 +275,10 @@ int main(int argc, char *argv[])
   {
     cout << s << endl;
   }
+
+  auto last = sections[sections.size()-1];
+  cout<<linkage.substr(last.start_pos, last.end_pos-last.start_pos) << ".." << endl;
+
   exit(0);
 #ifdef _1_
   cout << "Iterate..." << endl;
