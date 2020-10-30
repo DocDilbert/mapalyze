@@ -244,6 +244,7 @@ struct Object
   string filename;
   string address;
   string size;
+  Filter filter;
 };
 
 ostream &operator<<(ostream &os, const Object &obj)
@@ -256,7 +257,7 @@ ostream &operator<<(ostream &os, const Object &obj)
   return os;
 }
 
-Object parse_object(vector<string> elements)
+Object parse_object(vector<string> elements, Filter filter)
 {
   string filename;
   if (boost::starts_with(elements[0], "*fill*"))
@@ -272,7 +273,8 @@ Object parse_object(vector<string> elements)
       .secname = elements[0],
       .address = elements[1],
       .size = elements[2],
-      .filename = filename
+      .filename = filename,
+      .filter  = filter
   };
 
   return obj;
@@ -312,7 +314,7 @@ vector<Object> parse_objects(string const &str, const Filter &filter)
         splitted.insert(splitted.end(), splitted2.begin(), splitted2.end());
       }
 
-      objects.push_back(parse_object(splitted));
+      objects.push_back(parse_object(splitted, filter));
     }
 
     start = next + 1;
