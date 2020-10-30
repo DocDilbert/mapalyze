@@ -7,112 +7,12 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
 using namespace std;
-
-struct MapSection
-{
-  uint32_t begin_adr;
-  uint32_t end_adr;
-  std::string object_name;
-
-  uint32_t GetSize() const
-  {
-    return end_adr - begin_adr + 1;
-  }
-
-  friend ostream &operator<<(ostream &os, const MapSection &msec);
-};
-
-ostream &operator<<(ostream &os, const MapSection &msec)
-{
-  os << "0x" << hex << uppercase << setw(8) << msec.begin_adr << " |"
-     << "0x" << hex << uppercase << setw(8) << msec.end_adr
-     << " |" << dec << setw(8) << msec.GetSize() << " | " << msec.object_name;
-  return os;
-}
-
-std::string get_file_contents(const char *filename)
-{
-  std::ifstream in(filename, std::ios::in | std::ios::binary);
-  if (in)
-  {
-    std::string contents;
-    in.seekg(0, std::ios::end);
-    contents.resize(in.tellg());
-    in.seekg(0, std::ios::beg);
-    in.read(&contents[0], contents.size());
-    in.close();
-    return (contents);
-  }
-  throw(errno);
-}
-
-std::vector<std::string>
-split(std::string const &original, char separator)
-{
-  std::vector<std::string> results;
-  std::string::const_iterator start = original.begin();
-  std::string::const_iterator end = original.end();
-  std::string::const_iterator next = std::find(start, end, separator);
-  while (next != end)
-  {
-    results.push_back(std::string(start, next));
-    start = next + 1;
-    auto next_char = start + 1;
-    next = std::find(start, end, separator);
-
-    while (next == next_char)
-    {
-      start = next + 1;
-      next_char = start + 1;
-      next = std::find(start, end, separator);
-    }
-  }
-  results.push_back(std::string(start, next));
-  return results;
-}
-bool is_space(char c)
-{
-  return c == ' ';
-}
-
-MapSection parse_entry(string const &entry)
-{
-  vector<string> container;
-  //container.reserve(5);
-
-  auto splitted = boost::split(container, entry, is_space, boost::token_compress_on);
-  if (splitted.size() <= 3)
-  {
-    throw "No enough elements";
-  }
-
-  if (!boost::starts_with(splitted[1], "0x"))
-  {
-    throw "First element is not a hex value";
-  };
-
-  std::size_t processed = 0;
-  auto address = std::stoul(splitted[1].substr(2, string::npos), &processed, 16);
-
-  if (!boost::starts_with(splitted[2], "0x"))
-  {
-    throw "Second element is not a hex value";
-  };
-
-  auto size = std::stoul(splitted[2].substr(2, string::npos), &processed, 16);
-
-  MapSection sec = {
-      .begin_adr = static_cast<uint32_t>(address),
-      .end_adr = static_cast<uint32_t>(address) + static_cast<uint32_t>(size) - 1,
-      .object_name = splitted[3]};
-
-  return sec;
-}
 
 enum SectionType
 {
@@ -161,18 +61,43 @@ unsigned count_trailing_spaces(const string &str)
   return str.length();
 }
 
+std::string get_file_contents(const char *filename)
+{
+  std::ifstream in(filename, std::ios::in | std::ios::binary);
+  if (in)
+  {
+    std::string contents;
+    in.seekg(0, std::ios::end);
+    contents.resize(in.tellg());
+    in.seekg(0, std::ios::beg);
+    in.read(&contents[0], contents.size());
+    in.close();
+    return (contents);
+  }
+  throw(errno);
+}
+
+string remove_trailing_cr(string str) {
+  auto newline_pos = str.find("\r");
+  if (newline_pos != string::npos)
+  {
+    str = str.substr(0, newline_pos);
+  }
+
+  return str;
+}
 Section parse_section(const string &line, unsigned start_pos)
 {
-
   vector<string> container;
-  //container.reserve(5);
+  auto splitted = boost::split(container, line, boost::is_any_of(" "), boost::token_compress_on);
 
-  auto splitted = boost::split(container, line, is_space, boost::token_compress_on);
+  // remove trailing newline if it exists
+  auto size = remove_trailing_cr(splitted[2]);
 
   Section new_sec = {
       .section_name = splitted[0],
       .adress = splitted[1],
-      .size = splitted[2].substr(0, splitted[2].size() - 1),
+      .size = size,
       .start_pos = start_pos,
       .end_pos = -1 // updated later
   };
@@ -196,8 +121,6 @@ ostream &operator<<(ostream &os, const Section &msec)
 vector<Section> parse_sections(string const &str)
 {
   const char separator = '\n';
-
-  vector<MapSection> list;
   std::string::const_iterator start = str.begin();
   std::string::const_iterator end = str.end();
   std::string::const_iterator next = std::find(start, end, separator);
@@ -217,14 +140,99 @@ vector<Section> parse_sections(string const &str)
     start = next + 1;
     next = std::find(start, end, separator);
   }
-  
+
   // update end positions
   for (int i = 0; i < sections.size() - 1; i++)
   {
-    sections[i].end_pos = sections[i + 1].start_pos - 1;
+    sections[i].end_pos = sections[i + 1].start_pos - 3;
   }
-  sections[sections.size()-1].end_pos = str.size()-1;
+  sections[sections.size() - 1].end_pos = str.size() - 1;
   return sections;
+}
+
+bool is_filter(const string& line) {
+    auto l  = remove_trailing_cr(line);
+    boost::trim(l);
+
+     if ((boost::starts_with(l, "*(")) && (boost::ends_with(l, ")"))) {
+       return true;
+     }
+     
+    return false;
+}
+
+struct Filter {
+  Section section;
+  string filter;
+  long start_pos;
+  long end_pos;
+};
+
+ostream &operator<<(ostream &os, const Filter &filter)
+{
+  os.width(20);
+  os << left << filter.section.section_name << " ";    
+  os << left << filter.filter;
+
+  os.width(10);
+  os   << " " << filter.start_pos
+     << " " << filter.end_pos;
+
+  return os;
+}
+
+
+
+Filter parse_filter(const string &line, Section sec, unsigned start_pos)
+{
+  auto l  = remove_trailing_cr(line);
+  boost::trim(l);
+
+  Filter new_filter = {
+      .section = sec,
+      .filter = l,
+      .start_pos = start_pos,
+      .end_pos = -1
+  };
+
+  return new_filter;
+}
+
+
+vector<Filter> parse_filters(string const &str, const Section &sec)
+{
+  const char separator = '\n';
+  std::string::const_iterator start = str.begin() + sec.start_pos;
+  std::string::const_iterator end = str.begin() + sec.end_pos;
+  std::string::const_iterator next = std::find(start, end, separator);
+
+  vector<Filter> filters;
+  while (next != end)
+  {
+    auto line = std::string(start, next);
+    // reduce solutions
+    if (count_trailing_spaces(line) == 1)
+    {
+        if(is_filter(line)) {
+          filters.push_back(parse_filter(line, sec, start - str.begin()));
+        }
+    }
+    
+    start = next + 1;
+    next = std::find(start, end, separator);
+  }
+  // update end positions
+  if (filters.size()>1) {
+    for (int i = 0; i < filters.size() - 1; i++)
+    {
+      filters[i].end_pos = filters[i + 1].start_pos - 2;
+    }
+  }
+  if (filters.size()>0) {
+    filters[filters.size() - 1].end_pos = sec.end_pos - 1;
+  }
+
+  return filters;
 }
 
 int main(int argc, char *argv[])
@@ -271,33 +279,22 @@ int main(int argc, char *argv[])
 
   cout << "Parse..." << endl;
   auto sections = parse_sections(linkage);
+  vector<Filter> filters_combined;
   for (auto s : sections)
   {
-    cout << s << endl;
+    auto filters = parse_filters(linkage, s);
+    filters_combined.insert(filters_combined.end(), filters.begin(), filters.end());
   }
 
-  auto last = sections[sections.size()-1];
-  cout<<linkage.substr(last.start_pos, last.end_pos-last.start_pos) << ".." << endl;
+    for (auto f: filters_combined) {
+      cout << f << endl;
+    } 
+
+    auto filter = filters_combined[3];
+    //cout << linkage.substr(filter.start_pos, filter.end_pos-filter.start_pos) <<endl;
 
   exit(0);
-#ifdef _1_
-  cout << "Iterate..." << endl;
-  auto it = sections.begin();
-  auto last = *it;
-  it++; // iterate from second element
-  for (; it != sections.end(); it++)
-  {
-  }
 
-  sort(sections.begin(), sections.end(), [](MapSection a, MapSection b) {
-    return (a.begin_adr > b.begin_adr);
-  });
-
-  for (auto v : sections)
-  {
-    cout << v << endl;
-  }
-#endif
   //auto contents = split(str, '\n');
   //std::cout << contents.size() << std::endl;
   return 0;
