@@ -77,7 +77,8 @@ std::string get_file_contents(const char *filename)
   throw(errno);
 }
 
-string remove_trailing_cr(string str) {
+string remove_trailing_cr(string str)
+{
   auto newline_pos = str.find("\r");
   if (newline_pos != string::npos)
   {
@@ -150,18 +151,21 @@ vector<Section> parse_sections(string const &str)
   return sections;
 }
 
-bool is_filter(const string& line) {
-    auto l  = remove_trailing_cr(line);
-    boost::trim(l);
+bool is_filter(const string &line)
+{
+  auto l = remove_trailing_cr(line);
+  boost::trim(l);
 
-     if ((boost::starts_with(l, "*(")) && (boost::ends_with(l, ")"))) {
-       return true;
-     }
-     
-    return false;
+  if ((boost::starts_with(l, "*(")) && (boost::ends_with(l, ")")))
+  {
+    return true;
+  }
+
+  return false;
 }
 
-struct Filter {
+struct Filter
+{
   Section section;
   string filter;
   long start_pos;
@@ -171,33 +175,29 @@ struct Filter {
 ostream &operator<<(ostream &os, const Filter &filter)
 {
   os.width(20);
-  os << left << filter.section.section_name << " ";    
+  os << left << filter.section.section_name << " ";
   os << left << filter.filter;
 
   os.width(10);
-  os   << " " << filter.start_pos
+  os << " " << filter.start_pos
      << " " << filter.end_pos;
 
   return os;
 }
 
-
-
 Filter parse_filter(const string &line, Section sec, unsigned start_pos)
 {
-  auto l  = remove_trailing_cr(line);
+  auto l = remove_trailing_cr(line);
   boost::trim(l);
 
   Filter new_filter = {
       .section = sec,
       .filter = l,
       .start_pos = start_pos,
-      .end_pos = -1
-  };
+      .end_pos = -1};
 
   return new_filter;
 }
-
 
 vector<Filter> parse_filters(string const &str, const Section &sec)
 {
@@ -213,22 +213,25 @@ vector<Filter> parse_filters(string const &str, const Section &sec)
     // reduce solutions
     if (count_trailing_spaces(line) == 1)
     {
-        if(is_filter(line)) {
-          filters.push_back(parse_filter(line, sec, start - str.begin()));
-        }
+      if (is_filter(line))
+      {
+        filters.push_back(parse_filter(line, sec, start - str.begin()));
+      }
     }
-    
+
     start = next + 1;
     next = std::find(start, end, separator);
   }
   // update end positions
-  if (filters.size()>1) {
+  if (filters.size() > 1)
+  {
     for (int i = 0; i < filters.size() - 1; i++)
     {
       filters[i].end_pos = filters[i + 1].start_pos - 2;
     }
   }
-  if (filters.size()>0) {
+  if (filters.size() > 0)
+  {
     filters[filters.size() - 1].end_pos = sec.end_pos - 1;
   }
 
@@ -286,16 +289,12 @@ int main(int argc, char *argv[])
     filters_combined.insert(filters_combined.end(), filters.begin(), filters.end());
   }
 
-    for (auto f: filters_combined) {
-      cout << f << endl;
-    } 
+  for (auto f : filters_combined)
+  {
+    cout << f << endl;
+  }
 
-    auto filter = filters_combined[3];
-    //cout << linkage.substr(filter.start_pos, filter.end_pos-filter.start_pos) <<endl;
-
-  exit(0);
-
-  //auto contents = split(str, '\n');
-  //std::cout << contents.size() << std::endl;
+  auto filter = filters_combined[3];
+  //cout << linkage.substr(filter.start_pos, filter.end_pos-filter.start_pos) <<endl;
   return 0;
 }
