@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/mapalyze",
             "args": ["EDESapp.map"],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"

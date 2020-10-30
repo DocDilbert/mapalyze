@@ -75,16 +75,16 @@ split(std::string const &original, char separator)
   results.push_back(std::string(start, next));
   return results;
 }
-bool is_space( char c ) 
+bool is_space(char c)
 {
-  return c==' ';
+  return c == ' ';
 }
 
 MapSection parse_entry(string const &entry)
 {
   vector<string> container;
   //container.reserve(5);
- 
+
   auto splitted = boost::split(container, entry, is_space, boost::token_compress_on);
   if (splitted.size() <= 3)
   {
@@ -114,31 +114,105 @@ MapSection parse_entry(string const &entry)
   return sec;
 }
 
-vector<MapSection> parse_lines(string const &str)
+enum SectionType
+{
+  LOAD,
+  SECTION,
+  EMPTY,
+  UNKNOWN
+};
+
+struct Section
+{
+  string section_name;
+  string adress;
+  string size;
+  long start_pos;
+};
+
+void ParseObjectLine(const std::string &str)
+{
+  cout << str << endl;
+}
+SectionType IdentifyLine(const std::string &str)
+{
+  if (boost::starts_with(str, "LOAD"))
+  {
+    return SectionType::LOAD;
+  }
+  if (boost::starts_with(str, "\r"))
+  {
+    return SectionType::EMPTY;
+  }
+
+  return SectionType::SECTION;
+}
+
+unsigned count_trailing_spaces(const string &str)
+{
+  for (unsigned i = 0; i < str.length(); i++)
+  {
+    if (str[i] != ' ')
+    {
+      return i;
+    }
+  }
+  return str.length();
+}
+
+Section parse_section(const string &line, unsigned start_pos)
+{
+
+  vector<string> container;
+  //container.reserve(5);
+
+  auto splitted = boost::split(container, line, is_space, boost::token_compress_on);
+
+  Section new_sec = {
+      .section_name = splitted[0],
+      .adress = splitted[1],
+      .size = splitted[2],
+      .start_pos = start_pos
+  };
+
+  return new_sec;
+}
+
+ostream &operator<<(ostream &os, const Section &msec)
+{
+  os.width(20);
+  
+  os  << left << msec.section_name << " "<< msec.adress <<" "<< msec.size;
+  return os;
+}
+
+
+vector<Section> parse_sections(string const &str)
 {
   const char separator = '\n';
+
+  vector<MapSection> list;
   std::string::const_iterator start = str.begin();
   std::string::const_iterator end = str.end();
   std::string::const_iterator next = std::find(start, end, separator);
-  vector<MapSection> list;
 
+  vector<Section> sections;
 
   while (next != end)
   {
-    try
+    auto line = std::string(start, next);
+    if (count_trailing_spaces(line) == 0)
     {
-      auto sec = parse_entry(std::string(start, next));
-      list.push_back(sec);
+      if (IdentifyLine(line) == SectionType::SECTION)
+      {
+        sections.push_back(parse_section(line, start - str.begin()));
+      }
     }
-    catch (...)
-    {
-    }
-    
     start = next + 1;
     next = std::find(start, end, separator);
   }
 
-  return list;
+  return sections;
 }
 
 int main(int argc, char *argv[])
@@ -167,26 +241,47 @@ int main(int argc, char *argv[])
 
   auto &filename = result["filename"].as<std::string>();
 
-  cout<<"Read file..."<<endl;
+  cout << "Read file..." << endl;
   std::string str = get_file_contents(filename.c_str());
 
   // find sections
   auto mem_cfg_pos = str.find("Memory Configuration", 0);
+
+  // get the firts entry which is a linker placement
   auto linker_pos = str.find("Linker script and memory map", mem_cfg_pos);
-  auto output_pos = str.find("OUTPUT(", linker_pos);
+  auto linker_nl_pos = str.find("\n", linker_pos) + 1;
+  linker_nl_pos = str.find("\n", linker_nl_pos) + 1;
+  auto output_pos = str.find("OUTPUT(", linker_nl_pos);
 
-  cout<<"Extract..."<<endl;
+  cout << "Extract..." << endl;
   auto mem_cfg = str.substr(mem_cfg_pos, linker_pos - mem_cfg_pos);
-  auto linkage = str.substr(linker_pos, output_pos - linker_pos);
+  auto linkage = str.substr(linker_nl_pos, output_pos - linker_nl_pos);
 
-  cout<<"Parse..."<<endl;
-  auto sections = parse_lines(linkage);
-
-  cout<<"Iterate..."<<endl;
+  cout << "Parse..." << endl;
+  auto sections = parse_sections(linkage);
   for (auto s : sections)
   {
     cout << s << endl;
   }
+  exit(0);
+#ifdef _1_
+  cout << "Iterate..." << endl;
+  auto it = sections.begin();
+  auto last = *it;
+  it++; // iterate from second element
+  for (; it != sections.end(); it++)
+  {
+  }
+
+  sort(sections.begin(), sections.end(), [](MapSection a, MapSection b) {
+    return (a.begin_adr > b.begin_adr);
+  });
+
+  for (auto v : sections)
+  {
+    cout << v << endl;
+  }
+#endif
   //auto contents = split(str, '\n');
   //std::cout << contents.size() << std::endl;
   return 0;
